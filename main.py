@@ -10,21 +10,22 @@ rows = []
 #Setup the cli via click
 @click.command()
 @click.option('--ip', help="the IP range to be scanned")
+@click.option('--pt', help="ports to be scanned")
 
 
-def scan(ip):
+def scan(ip,pt):
     print(ip)
     ips = getrange(ip)
     out = []
     h = 0
     for x in ips:
         h += 1
-        print(x)
-        print(h)
+        print(f'\n -----   {x}')
+        print(f'#{h}')
         result = ping(x)
         print(result)
-        host = lookup(x)
-        print(host)
+        host = lookup(x,pt)
+        print(f'DNS: {host}')
         #Puts all the outputs in a list to be added to the out list as a matrix, to go into the csv file
         out = [h,x,result,host]
         rows.append(out)
@@ -36,12 +37,42 @@ def ping(ip):
             return '---- Passed! ----'
         else:
             return "Failed :("
-def lookup(ip):
+def lookup(ip,pt):
     try:
-        return socket.gethostbyaddr(ip)
+        r = socket.gethostbyaddr(ip)
+        if not pt == None:
+            portscan(ip,pt)
+        return r
     except:
         return "Failed"
+def portparse(ports: str) -> list[int]:
+    ports = ports.strip()
 
+    if '-' in ports and ',' not in ports:
+        start,end = ports.split('-')
+        return list(range(int(start),int(end)+1))
+    return [int(p.strip()) for p in ports.split(',')]
+def portcheck(ip,port):
+    timeout = 1.0
+    try:
+        with socket.create_connection((ip,port), timeout=timeout):
+            return port, True
+    except:
+        return port, False
+
+def get_service(port):
+    try:
+        return socket.getservbyport(port)
+    except OSError:
+        return "unknown"
+    
+def portscan(ip,pt):
+    print('-- portscanning --')
+    ports = portparse(pt)
+    for x in ports:
+        portISOpen = portcheck(ip,x)
+        if portISOpen[1] == True:
+            print(f'>Port {x} is Open ({get_service(x)})')
 def write():
     #write output to csv file
     with open('results.csv', 'w') as csvf:
